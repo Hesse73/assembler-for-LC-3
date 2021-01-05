@@ -3,6 +3,7 @@ from match import *
 from asmError import Asmerror
 import re
 
+
 def main():
     filename = r'C:\Users\14570\Desktop\Python\ics\test.asm'
     asmFile = open(filename, 'r')
@@ -32,7 +33,7 @@ def main():
             continue
         #若为含有注释的有意义行
         elif ';' in line:
-            out.append(re.split(';',line,1)[0])
+            out.append(re.split(';', line, 1)[0])
         else:
             out.append(line)
     text = out
@@ -44,24 +45,24 @@ def main():
             if isPse(text[i]) == '.ORIG':
                 haveOrig = True
                 origLine = i + 1
-                message = getPse(text[i],'.ORIG')
+                message = getPse(text[i], '.ORIG')
                 if message['flag'] == 'error':
-                    Errors.addError(i+1,message['type'],message['descrip'])
+                    Errors.addError(i+1, message['type'], message['descrip'])
                 elif message['flag'] == 'instruction':
                     origAddress = message['origAddress']
             elif isPse(text[i]) == '.END':
                 haveEnd = True
                 endLine = i + 1
-                message = getPse(text[i],'.END')
+                message = getPse(text[i], '.END')
                 if message['flag'] == 'error':
-                    Errors.addError(i+1,message['type'],message['descrip'])
+                    Errors.addError(i+1, message['type'], message['descrip'])
         elif not haveEnd:
             if isPse(text[i]) == '.END':
                 haveEnd = True
                 endLine = i + 1
-                message = getPse(text[i],'.END')
+                message = getPse(text[i], '.END')
                 if message['flag'] == 'error':
-                    Errors.addError(i+1,message['type'],message['descrip'])
+                    Errors.addError(i+1, message['type'], message['descrip'])
     if not haveOrig:
         Errors.addError(-1, 'format error', 'no .orig statement in asm file')
     if not haveEnd:
@@ -69,10 +70,10 @@ def main():
     if not Errors.isCorrect():
         Errors.showError()
         return -1
-        
+
     #遍历文件，获取label，同时生成部分机器码
     curAddress = origAddress
-    for i in range(origLine,endLine - 1):
+    for i in range(origLine, endLine - 1):
         #在orig和end之前获取label
         if noInstruction(text[i]):
             continue
@@ -87,30 +88,32 @@ def main():
                 pseIns = isPse(instr)
                 #若label后为伪指令
                 if pseIns:
-                    message = getPse(instr,pseIns)
+                    message = getPse(instr, pseIns)
                     if message['flag'] == 'error':
-                        Errors.addError(i+1,message['type'],message['descrip'])
+                        Errors.addError(
+                            i+1, message['type'], message['descrip'])
                     elif message['flag'] == 'instruction':
                         for i in range(message['num']):
-                            mCodeDict['%x'%curAddress] = message['mCode'][i]
+                            mCodeDict['%x' % curAddress] = message['mCode'][i]
                             curAddress += 1
                 #若label后为正常指令
                 else:
                     curAddress += 1
             #否则说明此标签被重定义
             else:
-                Errors.addError(i+1,'syntax error','redefinition of label: %s'%label)
+                Errors.addError(i+1, 'syntax error',
+                                'redefinition of label: %s' % label)
         #说明此行是不带label的指令
         else:
             pseIns = isPse(text[i])
             #若此行是为伪指令
             if pseIns:
-                message = getPse(text[i],pseIns)
+                message = getPse(text[i], pseIns)
                 if message['flag'] == 'error':
-                    Errors.addError(i+1,message['type'],message['descrip'])
+                    Errors.addError(i+1, message['type'], message['descrip'])
                 elif message['flag'] == 'instruction':
                     for i in range(message['num']):
-                        mCodeDict['%x'%curAddress] = message['mCode'][i]
+                        mCodeDict['%x' % curAddress] = message['mCode'][i]
                         curAddress += 1
             #若此行是正常指令，留到后面再处理
             else:
@@ -122,7 +125,7 @@ def main():
         return -1
     #最后一次遍历，生成机器码，同时检查语法
     curAddress = origAddress
-    for i in range(origLine,endLine - 1):
+    for i in range(origLine, endLine - 1):
         #若为空行，则跳过
         if noInstruction(text[i]):
             continue
@@ -132,34 +135,33 @@ def main():
             insName = isIns(instr)
             #若此行是指令
             if insName != None:
-                message = getIns(instr,insName,symDict)
+                message = getIns(instr, insName, symDict)
                 if message['flag'] == 'error':
-                    Errors.addError(i+1,message['type'],message['descrip'])
+                    Errors.addError(i+1, message['type'], message['descrip'])
                     curAddress += 1
                 elif message['flag'] == 'instruction':
                     #保存指令的机器码，并使地址加一
-                    mCodeDict['%x'%curAddress] = message['mCode']
+                    mCodeDict['%x' % curAddress] = message['mCode']
                     curAddress += 1
         else:
             insName = isIns(instr)
             #若此行是指令
             if insName != None:
-                message = getIns(instr,insName,symDict)
+                message = getIns(instr, insName, curAddress, symDict)
                 if message['flag'] == 'error':
-                    Errors.addError(i+1,message['type'],message['descrip'])
+                    Errors.addError(i+1, message['type'], message['descrip'])
                     curAddress += 1
                 elif message['flag'] == 'instruction':
                     #保存指令的机器码，并使地址加一
-                    mCodeDict['%x'%curAddress] = message['mCode']
+                    mCodeDict['%x' % curAddress] = message['mCode']
                     curAddress += 1
             else:
-                Errors.addError(i+1,'syntax error','the assembler cannot interpret yout instruction')
+                Errors.addError(
+                    i+1, 'syntax error', 'the assembler cannot interpret yout instruction')
     if not Errors.isCorrect():
         Errors.showError()
         return -1
     print(mCodeDict)
-            
-
 
 
 if __name__ == '__main__':
