@@ -1,13 +1,13 @@
 import re
 
 #指令词典
-insDict = {'ADD': '0001', 'AND': '0101', 'BR': '0000000',
-           'BRn':'0000100','BRz':'0000010','BRp':'0000001','BRzp':'0000011',
-           'BRnp':'0000101','BRnz':'0000110','BRnzp':'0000111',
-           'JMP': '1100', 'JSR': '0100', 'JSRR': '0100',
+insDict = {'ADD': '0001', 'AND': '0101', 'BR': '0000111',
+           'BRN': '0000100', 'BRZ': '0000010', 'BRP': '0000001', 'BRZP': '0000011',
+           'BRNP': '0000101', 'BRNZ': '0000110', 'BRNZP': '0000111',
+           'JMP': '1100000', 'JSR': '01001', 'JSRR': '0100000',
            'LD': '0010', 'LDI': '1010', 'LDR': '0110',
            'LEA': '1110', 'NOT': '1001',  'ST': '0011',
-           'STI': '1011', 'STR': '0111', 'TRAP': '1111',
+           'STI': '1011', 'STR': '0111', 'TRAP': '11110000',
            'RET': '1100000111000000',
            'RTI': '1000000000000000',
            'GETC': '1111000000100000',
@@ -23,11 +23,11 @@ pseList = ['.ORIG', '.FILL', '.BLKW', '.STRINGZ', '.END']
 #label 操作码
 labelOp = ['.FILL', '.BLKW', '.STRINGZ', ]
 #所有的关键字
-keywords = ['ADD', 'AND', 'BR','BRn','BRz','BRp','BRzp','BRnp','BRnz','BRnzp', 'JMP', 'JSR', 'JSRR', 'LD', 'LDI', 'LDR', 'LEA',
+keywords = ['ADD', 'AND', 'BR', 'BRN', 'BRZ', 'BRP', 'BRZP', 'BRNP', 'BRNZ', 'BRNZP', 'JMP', 'JSR', 'JSRR', 'LD', 'LDI', 'LDR', 'LEA',
             'NOT',  'ST', 'STI', 'STR', 'TRAP', 'RET', 'RTI', 'GETC', 'OUT', 'PUTS',
             'IN', 'PUTSP', 'HALT', '.ORIG', '.FILL', '.BLKW', '.STRINGZ', '.END']
 #所有的分支类型
-Branches = ['BR','BRn','BRz','BRp','BRzp','BRnp','BRnz','BRnzp',]
+Branches = ['BR', 'BRN', 'BRZ', 'BRP', 'BRZP', 'BRNP', 'BRNZ', 'BRNZP', ]
 #正则表达式
 allComment = '[ \t]*;'  # 整行(或分割出的子字符串)均为注释
 empty = '[ \t]*'  # 没有实际意义的字符
@@ -58,11 +58,14 @@ def noInstruction(line):
 
 
 def getFirstNum(line):
-    getNum = re.compile(matchNum)
-    m = getNum.match(line)
-    if m:
-        return m.group(0).strip()
-    return None
+    try:
+        getNum = re.compile(matchNum)
+        m = getNum.match(line)
+        if m:
+            return m.group(0).strip()
+        return None
+    except:
+        return None
 
 
 def stripNum(line):
@@ -72,11 +75,14 @@ def stripNum(line):
 
 
 def getFirstString(line):
-    getString = re.compile(matchStr)
-    m = getString.match(line)
-    if m:
-        return m.group(0).strip()
-    return None
+    try:
+        getString = re.compile(matchStr)
+        m = getString.match(line)
+        if m:
+            return m.group(0).strip()
+        return None
+    except:
+        return None
 
 
 def stripString(line):
@@ -88,15 +94,18 @@ def stripString(line):
 def getLabel(line):
     #若有标签，则返回标签，否则返回None
     matchLabel = re.compile(labelHead)
-    m = matchLabel.match(line)
-    if m:
-        #去掉label头尾可能存在的无意义字符
-        label = m.group(0).strip()
-        #检查是否为关键字
-        if label.upper() not in keywords:
-            return label
+    try:
+        m = matchLabel.match(line)
+        if m:
+            #去掉label头尾可能存在的无意义字符
+            label = m.group(0).strip()
+            #检查是否为关键字或者类似x3000的数字
+            if label.upper() not in keywords and getFirstNum(label) == None:
+                return label
+            return None
         return None
-    return None
+    except:
+        return None
 
 
 def stripLabel(line):
@@ -108,16 +117,16 @@ def stripLabel(line):
 def calNum(strNum):
     if strNum[1] == '-':
         if strNum[0] == 'x':
-            targetNum = -int('0x' + strNum[2:], 16)
+            targetNum = -int(strNum[2:], 16)
         elif strNum[0] == 'b':
-            targetNum = -int('0b' + strNum[2:], 2)
+            targetNum = -int(strNum[2:], 2)
         elif strNum[0] == '#':
             targetNum = -int(strNum[2:])
     else:
         if strNum[0] == 'x':
-            targetNum = int('0x' + strNum[1:], 16)
+            targetNum = int(strNum[1:], 16)
         elif strNum[0] == 'b':
-            targetNum = int('0b' + strNum[1:], 2)
+            targetNum = int(strNum[1:], 2)
         elif strNum[0] == '#':
             targetNum = int(strNum[1:])
     return targetNum
@@ -142,12 +151,12 @@ def getPse(line, pseIns):
     spLine = re.split('[ \t]*%s' % selIns, line, 1, re.I)
     #需要取数字的伪操作码
     if selIns == '.ORIG' or selIns == '.FILL' or selIns == '.BLKW':
-        pseNum_LRange = {'.ORIG': 0, '.FILL': -2e15, '.BLKW': 1}
+        pseNum_LRange = {'.ORIG': 0, '.FILL': -2**15, '.BLKW': 1}
         strNum = getFirstNum(spLine[1])
         targetNum = 0
         try:
             targetNum = calNum(strNum)
-            if targetNum < pseNum_LRange[pseIns] or targetNum >= 2e15:
+            if targetNum < pseNum_LRange[pseIns] or targetNum >= 2**15:
                 ret['flag'] = 'error'
                 ret['type'] = 'logic error'
                 ret['descrip'] = 'you should use a reasonable %s number' % selIns
@@ -178,8 +187,10 @@ def getPse(line, pseIns):
         String = getFirstString(spLine[1])
         mCodes = []
         try:
-            for ch in String:
+            #去掉匹配到的字符串开头和结尾的双引号
+            for ch in String[1:-1]:
                 mCodes.append('{0:016b}'.format(ord(ch)))
+            mCodes.append('{0:016b}'.format(0))  # 最后一行为x0000
         except:
             ret['flag'] = 'error'
             ret['type'] = 'syntax error'
@@ -206,6 +217,61 @@ def getPse(line, pseIns):
         return ret
 
 
+def getOffset(tail, insName, curAddress, symDict, length, *noLabel):
+    ret = {}
+    strNum = getFirstNum(tail)
+    label = getLabel(tail)
+    noLab = False
+    if len(noLabel) > 0:
+        noLab = noLabel[0]
+    if strNum:  # tail is number
+        rest = stripNum(tail)
+        if not noInstruction(rest): #若后面还有其他内容
+            ret['flag'] = 'error'
+            ret['type'] = 'syntax error'
+            ret['descrip'] = 'there should be nothing after %s instruction other than comments'%insName
+            return ret
+        PCoffset = calNum(strNum)
+        if PCoffset < -2**(length-1) or PCoffset >= 2**(length - 1):
+            ret['flag'] = 'error'
+            ret['type'] = 'logic error'
+            ret['descrip'] = 'you should use a reasonable offset to %s' % insName
+            return ret
+        offset = format(PCoffset if PCoffset >= 0 else (
+            1 << length) + PCoffset, '0%db' % length)
+        ret['flag'] = 'instruction'
+        ret['offset'] = offset
+        return ret
+    elif not noLab and label:  # tail is label
+        rest = stripLabel(tail)
+        if not noInstruction(rest): #若后面还有其他内容
+            ret['flag'] = 'error'
+            ret['type'] = 'syntax error'
+            ret['descrip'] = 'there should be nothing after %s instruction other than comments'%insName
+        if label not in symDict.keys():
+            ret['flag'] = 'error'
+            ret['type'] = 'syntax error'
+            ret['descrip'] = 'label:%s is not defined' % label
+            return ret
+        else:  # label has been defined
+            PCoffset = symDict[label] - (curAddress + 1)
+            if PCoffset < -2**(length-1) or PCoffset >= 2**(length - 1):
+                ret['flag'] = 'error'
+                ret['type'] = 'logic error'
+                ret['descrip'] = 'you should use a reasonable offset to %s' % insName
+                return ret
+            offset = format(PCoffset if PCoffset >= 0 else (
+                1 << length) + PCoffset, '0%db' % length)
+            ret['flag'] = 'instruction'
+            ret['offset'] = offset
+            return ret
+    else:  # tail is nothing
+        ret['flag'] = 'error'
+        ret['type'] = 'syntax error'
+        ret['descrip'] = 'the assembler cannot interpret yout %s instruction'%insName
+        return ret
+
+
 def isIns(line):
     #若是指令，则返回指令名称，否则返回None
     for instruction in insDict.keys():
@@ -224,8 +290,15 @@ def getIns(line, ins, curAddress, symDict):
     ret = {}
     if insName in noOpIns:
         pattern = '[ \t]*%s([ \t]+|$)' % insName
-        if re.match(pattern, line):
-            #输入行的指令后面没有其他内容
+        m = re.match(pattern, line, re.I)
+        if m:
+            rest = line[m.end():]
+            #输入行的指令后面不应有其他内容
+            if not noInstruction(rest):
+                ret['flag'] = 'error'
+                ret['type'] = 'syntax error'
+                ret['descrip'] = 'there should be nothing after %s instruction other than comments'%insName
+                return ret
             ret['flag'] = 'instruction'
             ret['mCode'] = insDict[insName]
             return ret
@@ -237,8 +310,17 @@ def getIns(line, ins, curAddress, symDict):
     elif insName == 'ADD' or insName == 'AND':
         pattern1 = '[ \t]*%s[ \t]+R[0-7][ \t]*,[ \t]*R[0-7][ \t]*,[ \t]*R[0-7]($|[ \t]+)' % insName
         pattern2 = '[ \t]*%s[ \t]+R[0-7][ \t]*,[ \t]*R[0-7][ \t]*,[ \t]*[x#b](-\d+|\d+)($|[ \t]+)' % insName
-        if re.match(pattern1, line):
+        m1 = re.match(pattern1, line, re.I)
+        m2 = re.match(pattern2, line, re.I)
+        if m1:
             #表示 ADD(AND) DR,SR1,SR2的格式
+            rest = line[m1.end():]
+            #输入行的指令后面不应有其他内容
+            if not noInstruction(rest):
+                ret['flag'] = 'error'
+                ret['type'] = 'syntax error'
+                ret['descrip'] = 'there should be nothing after %s instruction other than comments'%insName
+                return ret
             spLines = re.split('[ \t]*,[ \t]*', line, 2)  # 分割两次，得到三个子串
             DR = int(spLines[0].strip()[-1])  # 第一部分的最后一个字符即为第一个寄存器的编号
             SR1 = int(spLines[1].strip()[-1])
@@ -248,20 +330,21 @@ def getIns(line, ins, curAddress, symDict):
             ret['flag'] = 'instruction'
             ret['mCode'] = mCode
             return ret
-        elif re.match(pattern2, line):
+        elif m2:
             #表示 ADD(AND) DR,SR1,imm5的格式
+            rest = line[m2.end():]
+            #输入行的指令后面不应有其他内容
+            if not noInstruction(rest):
+                ret['flag'] = 'error'
+                ret['type'] = 'syntax error'
+                ret['descrip'] = 'there should be nothing after %s instruction other than comments'%insName
+                return ret
             spLines = re.split('[ \t]*,[ \t]*', line, 2)  # 分割两次，得到三个子串
             DR = int(spLines[0].strip()[-1])  # 第一部分的最后一个字符即为第一个寄存器的编号
             SR1 = int(spLines[1].strip()[-1])
             strNum = spLines[2].strip()
-            try:
-                imm5 = calNum(strNum)
-                if imm5 < -2e4 or imm5 >= 2e4:
-                    ret['flag'] = 'error'
-                    ret['type'] = 'logic error'
-                    ret['descrip'] = 'you should use a reasonable number to ADD'
-                    return ret
-            except:
+            imm5 = calNum(strNum)
+            if imm5 < -2**4 or imm5 >= 2**4:
                 ret['flag'] = 'error'
                 ret['type'] = 'logic error'
                 ret['descrip'] = 'you should use a reasonable number to ADD'
@@ -273,40 +356,152 @@ def getIns(line, ins, curAddress, symDict):
             return ret
         else:
             ret['flag'] = 'error'
-            ret['type'] = 'syntax error'
+            ret['type'] = 'unknown error'
             ret['descrip'] = 'the assembler cannot interpret yout instruction'
             return ret
     elif insName in Branches:
-        m = re.match('[ \t]*%s'%insName,line)
-        tail = line[m.end():]#获取剩下的部分
-        strNum = getFirstNum(tail)
-        label = getLabel(tail)
-        if strNum:    #tail is number
-            PCoffset = calNum(strNum)
-            if PCoffest < -2e8 or PCoffset >= 2e8:
+        m = re.match('[ \t]*%s' % insName, line, re.I)
+        tail = line[m.end():]  # 获取剩下的部分
+        PCoffset = getOffset(tail, insName, curAddress, symDict, 9)
+        if PCoffset['flag'] == 'error':
+            return PCoffset
+        elif PCoffset['flag'] == 'instruction':
+            ret['flag'] = 'instruction'
+            ret['mCode'] = insDict[insName] + PCoffset['offset']
+            return ret
+    elif insName == 'JMP':
+        pattern = '[ \t]*JMP[ \t]+R[0-7]($|[ \t]+)'
+        m = re.match(pattern, line, re.I)
+        if m:
+            rest = line[m.end():]
+            #输入行的指令后面不应有其他内容
+            if not noInstruction(rest):
                 ret['flag'] = 'error'
-                ret['type'] = 'logic error'
-                ret['descrip'] = 'you should use a reasonable offset to branch'
+                ret['type'] = 'syntax error'
+                ret['descrip'] = 'there should be nothing after %s instruction other than comments'%insName
                 return ret
-            mCode = insDict[insName] + format(PCoffset if PCoffset >= 0 else (1 << 9) + PCoffset, '09b')
+            #获取寄存器
+            BaseR = int(m.group().strip()[-1])
+            mCode = insDict[insName] + '{0:03b}'.format(BaseR)+'000000'
             ret['flag'] = 'instruction'
             ret['mCode'] = mCode
             return ret
-        elif label:   #tail is label
-            if label not in symDict.keys():
+        else:
+            ret['flag'] = 'error'
+            ret['type'] = 'syntax error'
+            ret['descrip'] = 'invalid JMP instruction'
+            return ret
+    elif insName == 'JSR':
+        m = re.match('[ \t]*JSR[ \t]+', line, re.I)
+        tail = line[m.end():]
+        PCoffset = getOffset(tail, insName, curAddress, symDict, 11)
+        if PCoffset['flag'] == 'error':
+            return PCoffset
+        elif PCoffset['flag'] == 'instruction':
+            ret['flag'] = 'instruction'
+            ret['mCode'] = insDict[insName] + PCoffset['offset']
+            return ret
+    elif insName == 'JSRR':
+        pattern = '[ \t]*JSRR[ \t]+R[0-7]($|[ \t]+)'
+        m = re.match(pattern, line, re.I)
+        if m:
+            rest = line[m.end():]
+            #输入行的指令后面不应有其他内容
+            if not noInstruction(rest):
                 ret['flag'] = 'error'
                 ret['type'] = 'syntax error'
-                ret['descrip'] = 'label:%s is not defined'%label
+                ret['descrip'] = 'there should be nothing after %s instruction other than comments'%insName
                 return ret
-            else:     #label has been defined
-                PCoffset = symDict['label'] - curAddress
-                if PCoffest < -2e8 or PCoffset >= 2e8:
-                    ret['flag'] = 'error'
-                    ret['type'] = 'logic error'
-                    ret['descrip'] = 'you should use a reasonable offset to branch'
-                    return ret
-                mCode = insDict[insName] + format(PCoffset if PCoffset >= 0 else (1 << 9) + PCoffset, '09b')
+            #获取寄存器
+            BaseR = int(m.group().strip()[-1])
+            mCode = insDict[insName] + '{0:03b}'.format(BaseR)+'000000'
+            ret['flag'] = 'instruction'
+            ret['mCode'] = mCode
+            return ret
+        else:
+            ret['flag'] = 'error'
+            ret['type'] = 'syntax error'
+            ret['descrip'] = 'invalid JSRR instruction'
+            return ret
+    elif insName == 'LD' or insName == 'LDI' or insName == 'ST' or insName == 'STI' or insName == 'LEA':
+        pattern = '[ \t]*%s[ \t]+R[0-7][ \t]*,[ \t]*' % insName
+        m = re.match(pattern, line, re.I)
+        if m:
+            tail = line[m.end():]
+            m = re.match('[ \t]*%s[ \t]+R[0-7][ \t]*' % insName, line, re.I)
+            DR = int(m.group().strip()[-1])
+            PCoffset = getOffset(tail, insName, curAddress, symDict, 9)
+            if PCoffset['flag'] == 'error':
+                return PCoffset
+            elif PCoffset['flag'] == 'instruction':
                 ret['flag'] = 'instruction'
-                ret['mCode'] = mCode
+                ret['mCode'] = insDict[insName] + \
+                    '{0:03b}'.format(DR)+PCoffset['offset']
                 return ret
-                
+        else:
+            ret['flag'] = 'error'
+            ret['type'] = 'syntax error'
+            ret['descrip'] = 'invalid %s instruction' % insName
+            return ret
+    elif insName == 'LDR' or insName == 'STR':
+        ret = {}
+        # instr DR/SR , BaseR , offset6
+        pattern = '[ \t]*%s[ \t]+R[0-7][ \t]*,[ \t]*R[0-7][ \t]*,[ \t]*' % insName
+        m = re.match(pattern, line, re.I)
+        if m:
+            #按逗号分割两次
+            spLines = re.split(',', line, 2)
+            DR = int(spLines[0].strip()[-1])
+            BaseR = int(spLines[1].strip()[-1])
+            tail = spLines[2]
+            offset = getOffset(tail, insName, curAddress, symDict, 6, True)
+            if offset['flag'] == 'error':
+                return offset
+            elif offset['flag'] == 'instruction':
+                ret['flag'] = 'instruction'
+                ret['mCode'] = insDict[insName] + \
+                    '{0:03b}'.format(
+                        DR)+'{0:03b}'.format(BaseR)+offset['offset']
+                return ret
+        else:
+            ret['flag'] = 'error'
+            ret['type'] = 'syntax error'
+            ret['descrip'] = 'invalid %s instruction' % insName
+            return ret
+
+    elif insName == 'NOT':
+        ret = {}
+        pattern  = '[ \t]*NOT[ \t]+R[0-7][ \t]*,[ \t]*R[0-7]([ \t]*|&)'
+        m = re.match(pattern,line,re.I)
+        if m:
+            rest = line[m.end():]
+            #输入行的指令后面不应有其他内容
+            if not noInstruction(rest):
+                ret['flag'] = 'error'
+                ret['type'] = 'syntax error'
+                ret['descrip'] = 'there should be nothing after %s instruction other than comments'%insName
+                return ret
+            spLines = re.split(',',m.group(),1)
+            DR = int(spLines[0].strip()[-1])
+            SR = int(spLines[1].strip()[-1])
+            mCode = insDict[insName] + '{0:03b}'.format(DR) + '{0:03b}'.format(SR) + '111111'
+            ret['flag'] = 'instruction'
+            ret['mCode'] = mCode
+            return ret
+        else:
+            ret['flag'] = 'error'
+            ret['type'] = 'syntax error'
+            ret['descrip'] = 'invalid %s instruction' % insName
+            return ret
+
+    elif insName == 'TRAP':
+        ret = {}
+        m = re.match('[ \t]*TRAP[ \t]+',line,re.I)
+        tail = line[m.end():]
+        trapvect = getOffset(tail, insName, curAddress, symDict, 8, True)
+        if trapvect['flag'] == 'error':
+            return trapvect
+        elif trapvect['flag'] == 'instruction':
+            ret['flag'] = 'instruction'
+            ret['mCode'] = insDict['TRAP'] + trapvect['offset']
+            return ret
