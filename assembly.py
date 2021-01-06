@@ -21,7 +21,7 @@ def main():
     labeledLine = []
     mCodeDict = {}
     '''
-    思路：首先去掉所有的注释和空行
+    思路：首先去掉所有的注释(空行不能去掉，否则不能正确标注行号)
     判断是否有Orig和END(否则就无法获取地址)
     然后按行获取label和操作码
     最后进行编译
@@ -29,10 +29,7 @@ def main():
     #去掉所有的注释和空行
     out = []
     for line in text:
-        if noInstruction(line):
-            continue
-        #若为含有注释的有意义行
-        elif ';' in line:
+        if ';' in line:
             out.append(re.split(';', line, 1)[0])
         else:
             out.append(line)
@@ -135,7 +132,7 @@ def main():
             insName = isIns(instr)
             #若此行是指令
             if insName != None:
-                message = getIns(instr, insName, symDict)
+                message = getIns(instr, insName,curAddress, symDict)
                 if message['flag'] == 'error':
                     Errors.addError(i+1, message['type'], message['descrip'])
                     curAddress += 1
@@ -144,10 +141,10 @@ def main():
                     mCodeDict['%x' % curAddress] = message['mCode']
                     curAddress += 1
         else:
-            insName = isIns(instr)
+            insName = isIns(text[i])
             #若此行是指令
             if insName != None:
-                message = getIns(instr, insName, curAddress, symDict)
+                message = getIns(text[i], insName, curAddress, symDict)
                 if message['flag'] == 'error':
                     Errors.addError(i+1, message['type'], message['descrip'])
                     curAddress += 1
@@ -157,12 +154,17 @@ def main():
                     curAddress += 1
             else:
                 Errors.addError(
-                    i+1, 'syntax error', 'the assembler cannot interpret yout instruction')
+                    i+1, 'unknown error', 'the assembler cannot interpret yout instruction')
     if not Errors.isCorrect():
         Errors.showError()
         return -1
-    print(mCodeDict)
+    print('{0:016b}'.format(origAddress))
+    for key in sorted(mCodeDict):
+        #print(key,':',mCodeDict[key])
+        print(key,':','%x'%int(mCodeDict[key],2))
 
-
+'''
+存在的问题，许多函数对于每一行的结尾并没有做检查
+'''
 if __name__ == '__main__':
     main()
