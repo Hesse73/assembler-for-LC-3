@@ -1,7 +1,9 @@
 import re
 
 #指令词典
-insDict = {'ADD': '0001', 'AND': '0101', 'BR': '0000',
+insDict = {'ADD': '0001', 'AND': '0101', 'BR': '0000000',
+           'BRn':'0000100','BRz':'0000010','BRp':'0000001','BRzp':'0000011',
+           'BRnp':'0000101','BRnz':'0000110','BRnzp':'0000111,
            'JMP': '1100', 'JSR': '0100', 'JSRR': '0100',
            'LD': '0010', 'LDI': '1010', 'LDR': '0110',
            'LEA': '1110', 'NOT': '1001',  'ST': '0011',
@@ -21,9 +23,11 @@ pseList = ['.ORIG', '.FILL', '.BLKW', '.STRINGZ', '.END']
 #label 操作码
 labelOp = ['.FILL', '.BLKW', '.STRINGZ', ]
 #所有的关键字
-keywords = ['ADD', 'AND', 'BR', 'JMP', 'JSR', 'JSRR', 'LD', 'LDI', 'LDR', 'LEA',
+keywords = ['ADD', 'AND', 'BR','BRn','BRz','BRp','BRzp','BRnp','BRnz','BRnzp', 'JMP', 'JSR', 'JSRR', 'LD', 'LDI', 'LDR', 'LEA',
             'NOT',  'ST', 'STI', 'STR', 'TRAP', 'RET', 'RTI', 'GETC', 'OUT', 'PUTS',
             'IN', 'PUTSP', 'HALT', '.ORIG', '.FILL', '.BLKW', '.STRINGZ', '.END']
+#所有的分支类型
+Branches = ['BR','BRn','BRz','BRp','BRzp','BRnp','BRnz','BRnzp',]
 #正则表达式
 allComment = '[ \t]*;'  # 整行(或分割出的子字符串)均为注释
 empty = '[ \t]*'  # 没有实际意义的字符
@@ -272,5 +276,37 @@ def getIns(line, ins, curAddress, symDict):
             ret['type'] = 'syntax error'
             ret['descrip'] = 'the assembler cannot interpret yout instruction'
             return ret
-    elif insName == 'BR':
-        return None
+    elif insName in Branches:
+        m = re.match('[ \t]*%s'%insName,line)
+        tail = line[m.end():]#获取剩下的部分
+        strNum = getFirstNum(tail)
+        label = getLabel(tail)
+        if strNum:    #tail is number
+            PCoffset = calNum(strNum)
+            if PCoffest < -2e8 or PCoffset >= 2e8:
+                ret['flag'] = 'error'
+                ret['type'] = 'logic error'
+                ret['descrip'] = 'you should use a reasonable offset to branch'
+                return ret
+            mCode = insDict[insName] + format(PCoffset if PCoffset >= 0 else (1 << 9) + PCoffset, '09b')
+            ret['flag'] = 'instruction'
+            ret['mCode'] = mCode
+            return ret
+        elif label:   #tail is label
+            if label not in symDict.keys():
+                ret['flag'] = 'error'
+                ret['type'] = 'syntax error'
+                ret['descrip'] = 'label:%s is not defined'%label
+                return ret
+            else:     #label has been defined
+                PCoffset = symDict['label'] - curAddress
+                if PCoffest < -2e8 or PCoffset >= 2e8:
+                    ret['flag'] = 'error'
+                    ret['type'] = 'logic error'
+                    ret['descrip'] = 'you should use a reasonable offset to branch'
+                    return ret
+                mCode = insDict[insName] + format(PCoffset if PCoffset >= 0 else (1 << 9) + PCoffset, '09b')
+                ret['flag'] = 'instruction'
+                ret['mCode'] = mCode
+                return ret
+                
